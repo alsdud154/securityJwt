@@ -1,0 +1,4 @@
+firebase:
+  account-file-url:
+    user: /Users/blocko/Downloads/service-account-file.json
+    admin: /Users/blocko/Downloads/service-account-file.json

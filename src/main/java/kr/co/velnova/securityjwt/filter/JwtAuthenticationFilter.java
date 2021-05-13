@@ -1,69 +1,61 @@
 package kr.co.velnova.securityjwt.filter;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.UnsupportedJwtException;
-import org.springframework.security.authentication.AuthenticationManager;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseToken;
+import kr.co.velnova.securityjwt.jwt.CustomAuthentication;
+import kr.co.velnova.securityjwt.jwt.JwtTokenProvider;
+import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.web.filter.GenericFilterBean;
 
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Map;
 
-public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
+@RequiredArgsConstructor
+public class JwtAuthenticationFilter extends GenericFilterBean {
 
+    private final JwtTokenProvider jwtTokenProvider;
 
-    public JwtAuthenticationFilter(AuthenticationManager authenticationManager) {
-        super(authenticationManager);
-    }
-
+    @SneakyThrows
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain chain)
-            throws IOException, ServletException
-    {
-        Authentication authentication = getAuthentication(request);
-        if(authentication != null){
-            SecurityContext context = SecurityContextHolder.getContext();
-            context.setAuthentication(authentication);
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        // 헤더에서 JWT 를 받아옵니다.
+        String jwt = jwtTokenProvider.resolveToken((HttpServletRequest) request);
+
+        String type = ((HttpServletRequest) request).getHeader("type");
+        String instanceName = null;
+
+        if ("user".equals(type)) {
+            instanceName = "userFirebaseApp";
+        } else {
+            instanceName = "adminFirebaseApp";
         }
+
+        FirebaseToken decodedToken = FirebaseAuth.getInstance(FirebaseApp.getInstance(instanceName)).verifyIdToken(jwt);
+
+        Map<String, Object> claims = decodedToken.getClaims();
+
+        Collection<GrantedAuthority> grantedAuthorities = new ArrayList<>();
+
+        grantedAuthorities.add((GrantedAuthority) () -> "ROLE_USER");
+        grantedAuthorities.add((GrantedAuthority) () -> "ROLE_ADMIN");
+//        grantedAuthorities.add((GrantedAuthority) () -> "ROLE_SUPER");
+
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(claims, "", grantedAuthorities));
 
         chain.doFilter(request, response);
     }
 
-    private Authentication getAuthentication(HttpServletRequest request){
-        String token = request.getHeader("Authorization");
-        if(token == null) {
-            return null;
-        }
-
-        Map<String, Object> claims = verifyJWT(token);
-        //스프링 내부에서 사용하는 Authentication
-        return new UsernamePasswordAuthenticationToken(claims, null);
-    }
-
-    public Map<String, Object> verifyJWT(String jwt) {
-
-        // 기본적인 token 유효성 체크
-        if (jwt == null || !jwt.startsWith("Bearer ")) {
-            throw new UnsupportedJwtException("jwt를 확인해주세요.");
-        }
-
-        // [Bearer ] 삭제
-        jwt = jwt.substring(7);
-
-        return Jwts.parser()
-                .setSigningKey("c2lsdmVybmluZS10ZWNoLXNwcmluZy1ib290LWp3dC10dXRvcmlhbC1zZWNyZXQtc2lsdmVybmluZS10ZWNoLXNwcmluZy1ib290LWp3dC10dXRvcmlhbC1zZWNyZXQK".getBytes(StandardCharsets.UTF_8)) // Set Key
-                .parseClaimsJws(jwt) // 파싱 및 검증, 실패 시 에러
-                .getBody();
-    }
 }
