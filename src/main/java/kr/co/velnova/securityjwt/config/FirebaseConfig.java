@@ -26,7 +26,7 @@ public class FirebaseConfig {
         GoogleCredentials credentials = GoogleCredentials.fromStream(new FileInputStream(adminFirebaseUrl))
                 .createScoped(Collections.singletonList("https://www.googleapis.com/auth/cloud-platform"));
 
-        FirebaseOptions options = new FirebaseOptions.Builder()
+        FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(credentials)
                 .build();
 
@@ -39,7 +39,7 @@ public class FirebaseConfig {
         GoogleCredentials credentials = GoogleCredentials.fromStream(new FileInputStream(userFirebaseUrl))
                 .createScoped(Collections.singletonList("https://www.googleapis.com/auth/cloud-platform"));
 
-        FirebaseOptions options = new FirebaseOptions.Builder()
+        FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(credentials)
                 .build();
 
